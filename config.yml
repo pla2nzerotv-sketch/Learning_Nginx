@@ -1,0 +1,16 @@
+listen: "127.0.0.1:8080"
+upstreams:
+  - host: "127.0.0.1"
+    port: 9001
+  - host: "127.0.0.1"
+    port: 9002
+timeouts:
+  connect_ms: 10
+  read_ms: 15
+  write_ms: 15
+  total_ms: 30
+limits:
+  max_client_conns: 1000
+  max_conns_per_upstream: 200
+logging:
+  level: "INFO"
