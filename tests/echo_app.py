@@ -15,7 +15,6 @@ async def read_root(request: Request):
 @app.post("/echo")
 async def read_root(request: Request):
     body = await request.body()
-    print(body)
     return {"message": body}
 
 
@@ -25,8 +24,8 @@ def start_server(port):
 
 
 if __name__ == '__main__':
-    p1 = multiprocessing.Process(target=start_server, args=(9020,))
-    p2 = multiprocessing.Process(target=start_server, args=(9021,))
+    p1 = multiprocessing.Process(target=start_server, args=(9001,))
+    p2 = multiprocessing.Process(target=start_server, args=(9002,))
     p1.start()
     p2.start()
     p1.join()

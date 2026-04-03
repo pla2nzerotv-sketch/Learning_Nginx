@@ -145,7 +145,7 @@ class ProxyServer:
                     self.logger.info("Таймаут общей обработки, закрытие соединения")
                     task_1.cancel()
                     task_2.cancel()
-                    await asyncio.gather(task_1, task_2)
+                    await asyncio.gather(task_1, task_2, return_exceptions=True)
 
     async def start_proxy(self):
         server = await asyncio.start_server(self.proxy, self.config.PROXY.HOST, self.config.PROXY.PORT)

@@ -1,7 +1,7 @@
 import asyncio
 
 from config import Config
-from proxy.proxy_server import ProxyServer
+from proxy.proxy_server_2 import ProxyServer
 
 if __name__ == '__main__':
     config = Config()

@@ -34,7 +34,7 @@ class Config:
         cls.PROXY.HOST = data['listen'].split(':')[0]
         cls.PROXY.PORT = data['listen'].split(':')[1]
         cls.Upstream.HOST = data['upstreams'][0].get('host')
-        cls.Upstream.PORT = data['upstreams'][0].get('port')
+        cls.Upstream.PORT_1 = data['upstreams'][0].get('port')
         cls.Upstream.PORT_2 = data['upstreams'][1].get('port')
         cls.Timeout.CONNECT_MS = data['timeouts'].get('connect_ms')
         cls.Timeout.READ_MS = data['timeouts'].get('read_ms')
