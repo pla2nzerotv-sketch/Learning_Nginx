@@ -36,8 +36,8 @@ class ProxyServer:
             await self.handler_body(reader, writer, header)
 
     async def handler_reader(self, reader):
-        buffer = []
-        while b'\r\n\r\n' not in b''.join(buffer):
+        buffer = b''
+        while b'\r\n\r\n' not in buffer:
             try:
                 header = await asyncio.wait_for(reader.read(1024), self.config.Timeout.READ_MS)
             except asyncio.TimeoutError:
@@ -45,8 +45,8 @@ class ProxyServer:
                 break
             if not header:
                 break
-            buffer.append(header)
-        return b''.join(buffer)
+            buffer += header
+        return buffer
 
     async def handler_body(self, reader, writer, header):
         current_content_length = 0
