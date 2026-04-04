@@ -24,7 +24,7 @@ class HandlerUpstream:
         if not pool.empty():
             reader, writer = await pool.get()
             if not reader.at_eof():
-                return await pool.get()
+                return reader, writer
             writer.close()
             await writer.wait_closed()
             return await self._connect(host, port)

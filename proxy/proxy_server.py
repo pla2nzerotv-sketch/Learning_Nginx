@@ -1,5 +1,7 @@
 import asyncio
 
+import uvloop
+
 from config import Config
 from proxy.logger_class import Logger
 from proxy.parser import HeaderParser
@@ -19,54 +21,47 @@ class ProxyServer:
         }
 
     def _header_to_lower(self, header):
-        lower_headers = {k.lower(): v for k, v in header['headers'].items()}
-        lower_headers['body'] = header.get('body', '')
-        return lower_headers
-
-    def _get_body_length(self, header):
-        return int(header.get('content-length:', '0')) - len(header.get('body', ''))
+        return {k.lower(): v for k, v in header['headers'].items()}
 
     async def handler(self, reader, writer):
         task_proxy_reader_header = await self.handler_reader(reader)
         header = self.parser.start_parser(task_proxy_reader_header)
         writer.write(self.parser.aggregate_data(header))
-        await writer.drain()
+        try:
+            await asyncio.wait_for(writer.drain(), self.config.Timeout.WRITE_MS)
+        except asyncio.TimeoutError:
+            raise Exception("Таймаут записи данных, закрытие соединения")
         header = self._header_to_lower(header)
         if header.get('content-length:'):
             await self.handler_body(reader, writer, header)
 
     async def handler_reader(self, reader):
-        buffer = b''
-        while b'\r\n\r\n' not in buffer:
-            try:
-                header = await asyncio.wait_for(reader.read(1024), self.config.Timeout.READ_MS)
-            except asyncio.TimeoutError:
-                self.logger.info("Таймаут ожидания данных, закрытие соединения")
-                break
-            if not header:
-                break
-            buffer += header
-        return buffer
+        try:
+            return await asyncio.wait_for(reader.readuntil(b'\r\n\r\n'), self.config.Timeout.READ_MS)
+        except asyncio.TimeoutError:
+            raise Exception("Таймаут ожидания данных, закрытие соединения")
+        except asyncio.IncompleteReadError:
+            raise Exception("Клиент закрыл соединение раньше, чем были получены заголовки")
 
     async def handler_body(self, reader, writer, header):
         current_content_length = 0
-        need_body_length = self._get_body_length(header)
-        if need_body_length == 0:
-            await self._write(writer, b'', header)
+        need_body_length = int(header.get('content-length:'))
         while need_body_length != current_content_length:
             try:
                 body = await asyncio.wait_for(reader.read(1024), self.config.Timeout.READ_MS)
             except asyncio.TimeoutError:
-                self.logger.info("Таймаут ожидания данных, закрытие соединения")
-                break
+                raise Exception("Таймаут ожидания данных, закрытие соединения")
             if not body:
                 break
             current_content_length += len(body)
-            await self._write(writer, body, header)
+            await self._write(writer, body)
 
-    async def _write(self, writer, body, header):
-        writer.write(header.pop('body', '').encode() + body)
-        await writer.drain()
+    async def _write(self, writer, body):
+        writer.write(body)
+        try:
+            await asyncio.wait_for(writer.drain(), self.config.Timeout.WRITE_MS)
+        except asyncio.TimeoutError:
+            raise Exception("Таймаут записи данных, закрытие соединения")
 
     async def proxy(self, proxy_reader, proxy_writer):
         self.logger.info(f"Попытка захвата семафора ПРОКСИ. Текущий лимит: {self.semaphore_proxy._value}")
@@ -78,6 +73,7 @@ class ProxyServer:
             semaphore_upstream = self.upstream_semaphores.get(port)
             async with semaphore_upstream:
                 self.logger.info(f"Попытка захвата семафора Апстрима. Текущий лимит: {semaphore_upstream._value}")
+                upstream_reader, upstream_writer = None, None
                 try:
                     upstream_reader, upstream_writer = await self.upstream.get_upstream_connection(host, port)
                     self.logger.info(
@@ -85,13 +81,9 @@ class ProxyServer:
                     )
                 except asyncio.TimeoutError:
                     self.logger.info("Таймаут подключения к ЭХО, закрытие соединения")
-                    proxy_writer.close()
-                    await proxy_writer.wait_closed()
                     return
                 except ConnectionRefusedError:
                     self.logger.info("Не удалось установить соединение с ЭХО")
-                    proxy_writer.close()
-                    await proxy_writer.wait_closed()
                     return
                 else:
                     task_1 = asyncio.create_task(self.handler(proxy_reader, upstream_writer))
@@ -109,7 +101,8 @@ class ProxyServer:
                     )
                     proxy_writer.close()
                     await proxy_writer.wait_closed()
-                    await self.upstream.return_upstream_connection(host, port, upstream_reader, upstream_writer)
+                    if upstream_writer is not None:
+                        await self.upstream.return_upstream_connection(host, port, upstream_reader, upstream_writer)
 
     async def start_proxy(self):
         server = await asyncio.start_server(self.proxy, self.config.PROXY.HOST, self.config.PROXY.PORT)

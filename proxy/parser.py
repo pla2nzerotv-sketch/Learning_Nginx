@@ -1,22 +1,16 @@
 class HeaderParser:
 
     def start_parser(self, header):
-        decoded_header = header.decode()
-        headers_part, body = decoded_header.split('\r\n\r\n', 1)
-        header = headers_part.split('\r\n')
+        decoded_header = header.decode().strip()
+        header = decoded_header.split('\r\n')
         start_line = header[0]
         if start_line.startswith('HTTP'):
             data = self._parser_for_response(start_line)
         else:
             data = self._parser_for_request(start_line)
-        headers = {}
-        for i in header[1:]:
-            value = i.split(':', 1)
-            headers[value[0] + ':'] = value[1].strip()
         return {
             'start_line': data,
-            'headers': headers,
-            'body': body,
+            'headers': {i.split(':', 1)[0] + ':': i.split(':', 1)[1].strip() for i in header[1:]},
         }
 
     def _parser_for_response(self, start_line):
@@ -36,18 +30,12 @@ class HeaderParser:
         }
 
     def aggregate_data(self, data: dict) -> bytes:
-        result = ''
+        result = []
 
         for key, value in data.items():
-            if key == 'body':
-                continue
             for inner_key, inner_value in value.items():
                 if inner_key in ['method', 'url_path', 'protocol', 'status', 'status_message']:
-                    if result == '':
-                        result += f"{inner_value}"
-                    else:
-                        result += f" {inner_value}"
+                    result.append(inner_value if not result else f" {inner_value}")
                 else:
-                    result += f"\r\n{inner_key} {inner_value}"
-
-        return (result + '\r\n\r\n').encode()
+                    result.append(f"\r\n{inner_key} {inner_value}")
+        return ''.join(result).encode() + b'\r\n\r\n'
