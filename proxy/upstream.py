@@ -22,6 +22,11 @@ class HandlerUpstream:
     async def get_upstream_connection(self, host, port):
         pool = self.upstream_connection_poll[(host, port)]
         if not pool.empty():
+            reader, writer = await pool.get()
+            if not reader.at_eof():
+                writer.close()
+                await writer.wait_closed()
+                return await self._connect(host, port)
             return await pool.get()
         return await self._connect(host, port)
 
