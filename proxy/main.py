@@ -1,10 +1,13 @@
 import asyncio
+import logging
 
 import uvloop
 
 from config import Config
 from proxy.proxy_server import ProxyServer
 # asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+
+
 
 if __name__ == '__main__':
     config = Config()

@@ -63,46 +63,42 @@ class ProxyServer:
         except asyncio.TimeoutError:
             raise Exception("Таймаут записи данных, закрытие соединения")
 
+    async def _connect_to_upstream(self, host, port):
+        async with self.upstream_semaphores.get(port):
+            return await self._process_to_connect(host, port)
+
+    async def _process_to_connect(self, host, port):
+        try:
+            return await self.upstream.get_upstream_connection(host, port)
+        except asyncio.TimeoutError:
+            self.logger.info("Таймаут подключения к ЭХО, закрытие соединения")
+            return None
+        except ConnectionRefusedError:
+            self.logger.info("Не удалось установить соединение с ЭХО")
+            return None
+
     async def proxy(self, proxy_reader, proxy_writer):
-        self.logger.info(f"Попытка захвата семафора ПРОКСИ. Текущий лимит: {self.semaphore_proxy._value}")
         async with self.semaphore_proxy:
-            self.logger.info(
-                f"Семафор ПРОКСИ захвачен, обработка соединения. Текущий лимит: {self.semaphore_proxy._value}"
-            )
+            upstream_reader, upstream_writer = None, None
             host, port = self.upstream.get_data_connect()
-            semaphore_upstream = self.upstream_semaphores.get(port)
-            async with semaphore_upstream:
-                self.logger.info(f"Попытка захвата семафора Апстрима. Текущий лимит: {semaphore_upstream._value}")
-                upstream_reader, upstream_writer = None, None
+            try:
+                upstream_reader, upstream_writer = await self._connect_to_upstream(host, port)
+            except Exception:
+                return
+            else:
+                task_1 = asyncio.create_task(self.handler(proxy_reader, upstream_writer))
+                task_2 = asyncio.create_task(self.handler(upstream_reader, proxy_writer))
                 try:
-                    upstream_reader, upstream_writer = await self.upstream.get_upstream_connection(host, port)
-                    self.logger.info(
-                        f"Семафор Апстрима захвачен, обработка соединения. Текущий лимит: {semaphore_upstream._value}"
-                    )
-                except asyncio.TimeoutError:
-                    self.logger.info("Таймаут подключения к ЭХО, закрытие соединения")
-                    return
-                except ConnectionRefusedError:
-                    self.logger.info("Не удалось установить соединение с ЭХО")
-                    return
-                else:
-                    task_1 = asyncio.create_task(self.handler(proxy_reader, upstream_writer))
-                    task_2 = asyncio.create_task(self.handler(upstream_reader, proxy_writer))
-                    try:
-                        await asyncio.wait_for(asyncio.gather(task_1, task_2), self.config.Timeout.TOTAL_MS)
-                    except asyncio.TimeoutError:
-                        self.logger.info("Таймаут общей обработки, закрытие соединения")
-                        task_1.cancel()
-                        task_2.cancel()
-                        await asyncio.gather(task_1, task_2, return_exceptions=True)
-                finally:
-                    self.logger.info(
-                        f"Семафор Апстрима отпущен, обработка соединения. Текущий лимит: {semaphore_upstream._value}"
-                    )
-                    proxy_writer.close()
-                    await proxy_writer.wait_closed()
-                    if upstream_writer is not None:
-                        await self.upstream.return_upstream_connection(host, port, upstream_reader, upstream_writer)
+                    await asyncio.wait_for(asyncio.gather(task_1, task_2), self.config.Timeout.TOTAL_MS)
+                except Exception:
+                    task_1.cancel()
+                    task_2.cancel()
+                    await asyncio.gather(task_1, task_2, return_exceptions=True)
+            finally:
+                proxy_writer.close()
+                await proxy_writer.wait_closed()
+            if upstream_writer:
+                await self.upstream.return_upstream_connection(host, port, upstream_reader, upstream_writer)
 
     async def start_proxy(self):
         server = await asyncio.start_server(self.proxy, self.config.PROXY.HOST, self.config.PROXY.PORT)
