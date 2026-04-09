@@ -5,12 +5,12 @@ upstreams:
   - host: "127.0.0.1"
     port: 9002
 timeouts:
-  connect_ms: 10
-  read_ms: 15
-  write_ms: 15
-  total_ms: 30
+  connect_ms: 2
+  read_ms: 3
+  write_ms: 3
+  total_ms: 10
 limits:
-  max_client_conns: 1000
-  max_conns_per_upstream: 200
+  max_client_conns: 1200
+  max_conns_per_upstream: 300
 logging:
-  level: "INFO"
+  level: "ERROR"

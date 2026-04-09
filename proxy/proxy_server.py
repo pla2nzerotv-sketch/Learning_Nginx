@@ -63,10 +63,6 @@ class ProxyServer:
         except asyncio.TimeoutError:
             raise Exception("Таймаут записи данных, закрытие соединения")
 
-    async def _connect_to_upstream(self, host, port):
-        async with self.upstream_semaphores.get(port):
-            return await self._process_to_connect(host, port)
-
     async def _process_to_connect(self, host, port):
         try:
             return await self.upstream.get_upstream_connection(host, port)
@@ -79,13 +75,14 @@ class ProxyServer:
 
     async def proxy(self, proxy_reader, proxy_writer):
         async with self.semaphore_proxy:
-            upstream_reader, upstream_writer = None, None
             host, port = self.upstream.get_data_connect()
-            try:
-                upstream_reader, upstream_writer = await self._connect_to_upstream(host, port)
-            except Exception:
-                return
-            else:
+            async with self.upstream_semaphores.get(port):
+                try:
+                    upstream_reader, upstream_writer = await self._process_to_connect(host, port)
+                except Exception:
+                    proxy_writer.close()
+                    await proxy_writer.wait_closed()
+                    return
                 task_1 = asyncio.create_task(self.handler(proxy_reader, upstream_writer))
                 task_2 = asyncio.create_task(self.handler(upstream_reader, proxy_writer))
                 try:
@@ -94,11 +91,14 @@ class ProxyServer:
                     task_1.cancel()
                     task_2.cancel()
                     await asyncio.gather(task_1, task_2, return_exceptions=True)
-            finally:
-                proxy_writer.close()
-                await proxy_writer.wait_closed()
-            if upstream_writer:
-                await self.upstream.return_upstream_connection(host, port, upstream_reader, upstream_writer)
+                finally:
+                    proxy_writer.close()
+                    await proxy_writer.wait_closed()
+                if upstream_writer:
+                    await self.upstream.return_upstream_connection(host, port, upstream_reader, upstream_writer)
+                    return
+                upstream_writer.close()
+                await upstream_writer.wait_closed()
 
     async def start_proxy(self):
         server = await asyncio.start_server(self.proxy, self.config.PROXY.HOST, self.config.PROXY.PORT)
