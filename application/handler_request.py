@@ -1,0 +1,2 @@
+class HandleHttpRequest:
+    pass

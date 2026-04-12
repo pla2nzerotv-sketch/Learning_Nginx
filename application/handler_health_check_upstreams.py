@@ -1,0 +1,2 @@
+class HealthCheckUpstreams:
+    pass
