@@ -1,12 +1,11 @@
 import logging
-
-from config import Config
+from domain.ports import ConfigProvider
 
 
 class Logger:
-    def __init__(self, config: Config):
+    def __init__(self, config_provider: ConfigProvider):
         logging.basicConfig(
-            level=config.LOGGING.LEVEL,
+            level=config_provider.config['logging']['level'],
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             handlers=[logging.StreamHandler()]
         )

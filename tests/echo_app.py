@@ -15,6 +15,7 @@ async def read_root(request: Request):
 @app.post("/echo")
 async def read_root(request: Request):
     body = await request.body()
+    print(body)
     return {"message": body}
 
 
