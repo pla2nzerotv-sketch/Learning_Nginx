@@ -1,4 +1,4 @@
-from domain.entities import HttpRequest
+from multiprocessing_nginx.domain.entities import HttpRequest
 
 
 class HeaderParser:

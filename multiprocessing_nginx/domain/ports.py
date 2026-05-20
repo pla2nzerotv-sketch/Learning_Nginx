@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 
-from domain.entities import Route, HttpRequest, BackendServer, HttpResponse, Upstream
+from multiprocessing_nginx.domain.entities import Route, HttpRequest, BackendServer, HttpResponse, Upstream
 
 
 class ConfigProvider(ABC):

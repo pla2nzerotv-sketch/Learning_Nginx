@@ -1,5 +1,6 @@
 import logging
-from domain.ports import ConfigProvider
+
+from multiprocessing_nginx.domain.ports import ConfigProvider
 
 
 class Logger:

@@ -1,5 +1,5 @@
-from domain.entities import HttpRequest, Route
-from domain.ports import ConfigProvider, HttpClient, UpstreamStrategy
+from multiprocessing_nginx.domain.entities import Route, HttpRequest
+from multiprocessing_nginx.domain.ports import ConfigProvider, HttpClient, UpstreamStrategy
 
 
 class HandleHttpRequest:
@@ -9,6 +9,6 @@ class HandleHttpRequest:
         self.upstream_strategy = upstream_strategy
         self.route = route
 
-    async def handler(self, request: HttpRequest):
+    def handler(self, request: HttpRequest):
         backend_server = self.upstream_strategy.select_backend(self.route.upstream)
-        return await self.http_client.send(request, backend_server)
+        return self.http_client.send(request, backend_server)

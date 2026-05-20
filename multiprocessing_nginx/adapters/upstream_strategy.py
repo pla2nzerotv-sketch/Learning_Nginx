@@ -1,7 +1,7 @@
 import itertools
 
-from domain.entities import BackendServer, Upstream
-from domain.ports import UpstreamStrategy
+from multiprocessing_nginx.domain.entities import BackendServer, Upstream
+from multiprocessing_nginx.domain.ports import UpstreamStrategy
 
 
 class RoundRobin(UpstreamStrategy):

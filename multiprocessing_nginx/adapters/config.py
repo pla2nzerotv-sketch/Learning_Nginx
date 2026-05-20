@@ -1,7 +1,7 @@
 import yaml
 
-from domain.entities import Route, Upstream, BackendServer
-from domain.ports import ConfigProvider
+from multiprocessing_nginx.domain.entities import Route, Upstream, BackendServer
+from multiprocessing_nginx.domain.ports import ConfigProvider
 
 
 class FileConfigProvider(ConfigProvider):
