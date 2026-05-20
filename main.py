@@ -1,3 +1,4 @@
+import os
 import socket
 import threading
 from multiprocessing import Process
@@ -11,7 +12,7 @@ from multiprocessing_nginx.adapters.http_server import HttpServer
 
 
 def handler():
-    config_provider = FileConfigProvider('config.yml')
+    config_provider = FileConfigProvider('../config.yml')
     logger = Logger(config_provider)
     max_conns_per_backend = config_provider.config['limits']['max_conns_per_upstream']
     backend_semaphores = {
